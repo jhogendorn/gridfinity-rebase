@@ -22,7 +22,10 @@ export const generateScadForShapes = (
   goldZMin: number,
   goldRotation: {
     type: RotationType;
-  }
+  },
+  // wrap the result in perimeter walls up to `units` gridfinity height
+  // units (7mm each) plus a standard stacking lip
+  stackable?: { units: number }
 ) => {
   const centers = shapes.map((shape) => {
     return getShapeBoundingBoxCentroid(shape);
@@ -115,6 +118,70 @@ export const generateScadForShapes = (
     );
   }
 
+  let stackShell = '';
+  let stackShellCall = '';
+  if (stackable) {
+    // outer outline: bounding box of the base grid, with the standard
+    // 0.25mm clearance per side
+    const xs = centers.map((c) => c[0]);
+    const ys = centers.map((c) => c[1]);
+    const w = Math.max(...xs) - Math.min(...xs) + pitch - 0.5;
+    const d = Math.max(...ys) - Math.min(...ys) + pitch - 0.5;
+    const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+    const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+
+    // the wall starts at the top of the bases (below that, anything at the
+    // bin outline would collide with baseplate sockets) and runs to
+    // units * 7mm, with a 4.4mm stacking lip on top. lip profile, bottom to
+    // top: 0.7 chamfer (wall inset 2.6 -> 1.9), 1.8 vertical, 1.65 chamfer
+    // (1.9 -> 0.25), 0.25 vertical rim. all chamfers 45 degrees.
+    const baseHeight = 4.75;
+    const zStart = zMin + baseHeight;
+    const bodyH = stackable.units * 7 - baseHeight;
+    const lipH = 4.4;
+    // 3.75 regardless of pitch: spec-compliant half-grid keeps the
+    // full-size corner radius (measured 3.8 on a reference half-grid module)
+    const r0 = 3.75;
+    const r = (inset: number) => Math.max(r0 - inset, 0.05);
+
+    stackShell = `
+module rrect(w, d, r) {
+    offset(r = r) square([w - 2 * r, d - 2 * r], center = true);
+}
+
+module stack_shell() {
+    translate([${cx}, ${cy}, ${zStart}]) difference() {
+        linear_extrude(${bodyH + lipH}) rrect(${w}, ${d}, ${r0});
+
+        // interior, up to the bottom of the lip
+        translate([0, 0, -0.01])
+            linear_extrude(${bodyH + 0.02})
+            rrect(${w - 5.2}, ${d - 5.2}, ${r(2.6)});
+
+        // stacking lip
+        translate([0, 0, ${bodyH}]) {
+            hull() {
+                linear_extrude(0.01)
+                    rrect(${w - 5.2}, ${d - 5.2}, ${r(2.6)});
+                translate([0, 0, 0.7]) linear_extrude(0.01)
+                    rrect(${w - 3.8}, ${d - 3.8}, ${r(1.9)});
+            }
+            translate([0, 0, 0.69]) linear_extrude(1.82)
+                rrect(${w - 3.8}, ${d - 3.8}, ${r(1.9)});
+            hull() {
+                translate([0, 0, 2.5]) linear_extrude(0.01)
+                    rrect(${w - 3.8}, ${d - 3.8}, ${r(1.9)});
+                translate([0, 0, 4.15]) linear_extrude(0.01)
+                    rrect(${w - 0.5}, ${d - 0.5}, ${r(0.25)});
+            }
+            translate([0, 0, 4.14]) linear_extrude(1.26)
+                rrect(${w - 0.5}, ${d - 0.5}, ${r(0.25)});
+        }
+    }
+}
+`;
+    stackShellCall = '    stack_shell();\n';
+  }
 
   if (goldPitch === pitch) {
     // same-pitch swap: cut each base individually (42mm to 2.6, inner to
@@ -125,6 +192,7 @@ export const generateScadForShapes = (
     return `
 $fs = 0.4;
 $fa = 4;
+${stackShell}
 module simple_cut() {
     translate([-${cutPitch} / 2, -${cutPitch} / 2, 0]) cube([${cutPitch}, ${cutPitch}, 2.6]);
     translate([-${inner} / 2, -${inner} / 2, 0]) cube([${inner}, ${inner}, 5.5]);
@@ -161,7 +229,7 @@ ${tileCenters
       `    translate([${center[0]}, ${center[1]}, ${zMin}]) preferred_bottom();`
   )
   .join('\n')}
-}
+${stackShellCall}}
 
 `;
   }
@@ -180,6 +248,7 @@ ${tileCenters
   return `
 $fs = 0.4;
 $fa = 4;
+${stackShell}
 module gold_unit() {
     intersection() {
         translate([-1 * ${goldCenter[0]},
@@ -219,7 +288,7 @@ ${tileCenters
                 translate([0, 0, -1 * (${zMin} + 5.75)])
                     ${rotateSCADCodeForRotation(rotation.type)} import("/toFix.stl");
     }
-}
+${stackShellCall}}
 
 `;
 };
