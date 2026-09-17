@@ -84,9 +84,23 @@ const getOcctSession = (): Promise<OcctSession> => {
   return sessionPromise;
 };
 
-export async function loadStepGeometry(
+// De-indexes a single occt mesh into a flat position array (vertex triples,
+// no index buffer) — the layout base detection and STL export both expect.
+function deindexMesh(mesh: OcctMesh): Float32Array {
+  const meshPositions = mesh.attributes.position.array;
+  const positions = new Float32Array(mesh.index.array.length * 3);
+  let offset = 0;
+  for (const vertexIndex of mesh.index.array) {
+    positions[offset++] = meshPositions[vertexIndex * 3];
+    positions[offset++] = meshPositions[vertexIndex * 3 + 1];
+    positions[offset++] = meshPositions[vertexIndex * 3 + 2];
+  }
+  return positions;
+}
+
+export async function loadStep(
   data: Uint8Array
-): Promise<BufferGeometry> {
+): Promise<{ geometry: BufferGeometry; bodyStls: Uint8Array[] }> {
   const { occt, diagnostics } = await getOcctSession();
   diagnostics.length = 0;
   const result = occt.ReadStepFile(data, OCCT_PARAMS);
@@ -100,24 +114,32 @@ export async function loadStepGeometry(
   }
   const meshes = result.meshes;
 
-  const vertexCount = meshes.reduce(
-    (sum, mesh) => sum + mesh.index.array.length,
-    0
-  );
-  const positions = new Float32Array(vertexCount * 3);
+  const bodyPositions = meshes.map(deindexMesh);
+
+  const vertexCount = bodyPositions.reduce((sum, p) => sum + p.length, 0);
+  const positions = new Float32Array(vertexCount);
   let offset = 0;
-  for (const mesh of meshes) {
-    const meshPositions = mesh.attributes.position.array;
-    for (const vertexIndex of mesh.index.array) {
-      positions[offset++] = meshPositions[vertexIndex * 3];
-      positions[offset++] = meshPositions[vertexIndex * 3 + 1];
-      positions[offset++] = meshPositions[vertexIndex * 3 + 2];
-    }
+  for (const p of bodyPositions) {
+    positions.set(p, offset);
+    offset += p.length;
   }
 
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  return geometry;
+
+  const bodyStls = bodyPositions.map((p) => {
+    const bodyGeometry = new BufferGeometry();
+    bodyGeometry.setAttribute('position', new BufferAttribute(p, 3));
+    return geometryToBinaryStl(bodyGeometry);
+  });
+
+  return { geometry, bodyStls };
+}
+
+export async function loadStepGeometry(
+  data: Uint8Array
+): Promise<BufferGeometry> {
+  return (await loadStep(data)).geometry;
 }
 
 export function geometryToBinaryStl(geometry: BufferGeometry): Uint8Array {

@@ -10,6 +10,8 @@ import { createHash } from 'node:crypto';
 
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
+import { stlEdgeTopology } from './stl-edge-topology.mjs';
+
 const execFileAsync = promisify(execFile);
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -25,6 +27,20 @@ const parseStl = async (filePath) => {
   const buffer = await readFile(filePath);
   return new STLLoader().parse(
     buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  );
+};
+
+// asserts the CLI's output STL is manifold: no open edges, no edges shared
+// by more than two triangles (the failure mode a naive multi-body STEP
+// merge across coincident planes produces, and that slicers reject)
+const assertManifoldStl = async (filePath) => {
+  const buffer = await readFile(filePath);
+  const { open, sharedOverTwo } = stlEdgeTopology(buffer);
+  assert.equal(open, 0, `${filePath}: expected 0 open edges, got ${open}`);
+  assert.equal(
+    sharedOverTwo,
+    0,
+    `${filePath}: expected 0 edges shared by >2 triangles, got ${sharedOverTwo}`
   );
 };
 
@@ -78,6 +94,8 @@ test(
       `expected y extent 41.5, got ${size.y}`
     );
     assert.ok(Math.abs(size.z - 10) < 0.01, `expected z extent 10, got ${size.z}`);
+
+    await assertManifoldStl(outputPath);
   }
 );
 
@@ -124,6 +142,8 @@ test(
       Math.abs(size.y - 41.5) < 0.01,
       `expected y extent 41.5, got ${size.y}`
     );
+
+    await assertManifoldStl(outputPath);
   }
 );
 
@@ -163,6 +183,8 @@ test(
       Math.abs(size.y - 41.5) < 0.01,
       `expected y extent 41.5, got ${size.y}`
     );
+
+    await assertManifoldStl(outputPath);
   }
 );
 
@@ -190,6 +212,8 @@ test(
 
     const triangleCount = geometry.attributes.position.count / 3;
     assert.ok(triangleCount > 0, `expected a parseable STL, got ${triangleCount} triangles`);
+
+    await assertManifoldStl(outputPath);
   }
 );
 
@@ -209,6 +233,8 @@ test(
     assert.ok(stdout.includes(expectedOutputPath));
     const buffer = await readFile(expectedOutputPath);
     assert.ok(buffer.length > 0);
+
+    await assertManifoldStl(expectedOutputPath);
   }
 );
 

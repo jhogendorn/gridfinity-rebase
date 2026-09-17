@@ -9,7 +9,9 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 // @ts-expect-error no declarations
 import occtimportjs from 'occt-import-js';
 
-import { loadStepGeometry, geometryToBinaryStl } from '../src/step-utils.ts';
+import { loadStepGeometry, loadStep, geometryToBinaryStl } from '../src/step-utils.ts';
+// @ts-expect-error no declarations
+import { stlEdgeTopology } from './stl-edge-topology.mjs';
 
 // this file is bundled to dist-test/step-utils.test.mjs before running, so
 // paths must be computed from import.meta.url rather than assumed cwd
@@ -102,6 +104,34 @@ test('loadStepGeometry: multi-body STEP merges every body', async () => {
     -1,
     `merged positions differ at ${bad}: ${actualPositions[bad]} !== ${expectedPositions[bad]}`
   );
+});
+
+test('loadStep: multi-body STEP returns one closed STL per body', async () => {
+  const stepPath = fixturePath(
+    'node_modules/occt-import-js/test/testfiles/cax-if/dm1-id-214.stp'
+  );
+  const data = new Uint8Array(await readFile(stepPath));
+
+  const { bodyStls } = await loadStep(data);
+  assert.equal(bodyStls.length, 7, 'fixture should have 7 bodies');
+
+  for (const [i, stl] of bodyStls.entries()) {
+    const parsed = new STLLoader().parse(
+      stl.buffer.slice(stl.byteOffset, stl.byteOffset + stl.byteLength)
+    );
+    assert.ok(
+      parsed.attributes.position.count > 0,
+      `body ${i}: expected a parseable STL with triangles`
+    );
+
+    const { open, sharedOverTwo } = stlEdgeTopology(stl);
+    assert.equal(open, 0, `body ${i}: expected 0 open edges, got ${open}`);
+    assert.equal(
+      sharedOverTwo,
+      0,
+      `body ${i}: expected 0 edges shared by >2 triangles, got ${sharedOverTwo}`
+    );
+  }
 });
 
 test('loadStepGeometry: garbage bytes reject', async () => {

@@ -71,17 +71,51 @@ pure-STL runs behave byte-identically to today.
 For a STEP input, the loaded `BufferGeometry` is serialized to binary
 STL with three's `STLExporter` (`parse(mesh, { binary: true })`, the
 geometry wrapped in a throwaway `Mesh`) and written under the same VFS
-name. The generated SCAD source is unchanged.
+name. The generated SCAD source is unchanged. (This is the single-body
+case; see "Multi-body files" below for >1 body, where each body is
+serialized separately and pre-unioned before it reaches this step.)
 
 ### Multi-body files
 
-A STEP file may contain multiple solids. All bodies tessellate into the
-one `BufferGeometry` and therefore into the one VFS STL as disjoint
-shells. Geometry is preserved end to end; body identity/names are not
-(STL has no concept of bodies). This matches how multi-shell STL inputs
-already flow through the pipeline, and holds for both the model and the
-reference input. Disjoint shells survive OpenSCAD's boolean ops as
-disjoint shells in the output STL.
+A STEP file may contain multiple solids. `loadStep` tessellates every
+body (for base detection, all bodies are still merged into the one
+non-indexed `BufferGeometry`, exactly as before), but each body is *also*
+de-indexed and serialized to its own binary STL.
+
+The naive approach — merge all bodies into one `BufferGeometry` and
+write one VFS STL — turned out to be unsafe when bodies **touch at an
+exact plane**, which real gridfinity STEP exports do (e.g. a base body
+spanning z 0–12 and foot bodies spanning z −4.75–0, meeting exactly at
+z=0). Each body is tessellated independently by occt, so the two
+surfaces sharing that plane get independently-generated, mismatched
+triangulations. Merged into one polygon soup and imported as a single
+`import()`, OpenSCAD's Manifold backend still reports `Status: NoError`
+(it happily unions a self-consistent soup), but the *exported STL* ends
+up with edges shared by more than two triangles — non-manifold by the
+STL edge-topology definition, even though OpenSCAD's own manifold check
+passed. Slicers reject that output. (Confirmed on a real 7-body
+screwdriver-holder export: 68 such edges; a denser 42mm example: 1266.)
+Disjoint (non-touching) shells were never affected — this only bites
+bodies that share a coincident surface.
+
+The fix: when a STEP file has more than one body, `cli.ts` writes each
+body's STL into the OpenSCAD VFS separately (`/body-0.stl`,
+`/body-1.stl`, ...) and runs a small pre-pass — `union() { import(...);
+... }` through the same manifold backend — before the body ever reaches
+the main SCAD program. Two exactly-touching separate manifold solids
+union cleanly into one manifold solid; a single soup of coincident
+shells does not. The result of that pre-union becomes `stlBytes`, i.e.
+the file that's written to `/toFix.stl` or `/gold.stl` for the real
+render, same as the single-body/STL case. (Verified on the same
+screwdriver file: pre-union output has 17440 triangles, 0 open edges, 0
+edges shared by more than two triangles.) A single-body STEP file
+(the common case) is unaffected — `stlBytes` is just that one body's
+STL, with no extra OpenSCAD pass.
+
+Body identity/names are not preserved (STL has no concept of bodies) —
+same as today. This matches how multi-shell STL inputs already flow
+through the pipeline, and holds for both the model and the reference
+input.
 
 Assumption, inherited from the existing detector: bases are detected
 only on faces within 0.001mm of the model's **global** minimum Z

@@ -16,7 +16,7 @@ import {
   getZMinForGeometry,
 } from './src/hull-utils.ts';
 import { generateScadForShapes } from './src/scad-utils.ts';
-import { geometryToBinaryStl, loadStepGeometry } from './src/step-utils.ts';
+import { loadStep } from './src/step-utils.ts';
 
 // @ts-expect-error no declaration
 import OpenSCAD from './src/openscad.js';
@@ -128,6 +128,73 @@ const log = (msg: string) => {
   if (opts.verbose) console.error(msg);
 };
 
+// next to the bundle in dist-cli, or under src/ when run from the repo root
+const createOpenScadInstance = async () => {
+  const cliDir = path.dirname(fileURLToPath(import.meta.url));
+  const wasmPath = [
+    path.join(cliDir, 'openscad.wasm'),
+    path.join(cliDir, 'src', 'openscad.wasm'),
+  ].find((p) => existsSync(p));
+  if (!wasmPath) {
+    console.error(`error: openscad.wasm not found next to ${cliDir}`);
+    process.exit(1);
+  }
+
+  const errorStatements: string[] = [];
+  const instance = await OpenSCAD({
+    noInitialRun: true,
+    wasmBinary: (await readFile(wasmPath)).buffer,
+    print: (s: string) => log(`openscad: ${s}`),
+    printErr: (s: string) => {
+      errorStatements.push(s);
+      log(`openscad: ${s}`);
+    },
+  });
+  return { instance, errorStatements };
+};
+
+// Multiple bodies from one STEP file tessellate independently, so bodies
+// that touch at an exact plane (e.g. z=0) end up with two mismatched
+// triangulations on the same coincident surface once merged into one
+// polygon soup. OpenSCAD's Manifold backend accepts that soup, but the
+// exported STL is non-manifold (edges shared by more than two triangles)
+// and slicers reject it. Unioning each body as its own separate manifold
+// solid first produces a clean result.
+const preUnionBodyStls = async (
+  filePath: string,
+  bodyStls: Uint8Array[]
+): Promise<Uint8Array> => {
+  const { instance, errorStatements } = await createOpenScadInstance();
+  bodyStls.forEach((stl, i) => instance.FS.writeFile(`/body-${i}.stl`, stl));
+  const scadSrc = `union() {\n${bodyStls
+    .map((_, i) => `  import("/body-${i}.stl");`)
+    .join('\n')}\n}\n`;
+  instance.FS.writeFile('/u.scad', scadSrc);
+
+  try {
+    instance.callMain([
+      '/u.scad',
+      '--backend=manifold',
+      '--export-format=binstl',
+      '-o',
+      '/u.stl',
+    ]);
+  } catch {
+    throw new Error(
+      `OpenSCAD failed to union the ${bodyStls.length} bodies in ${filePath}:\n${errorStatements.join('\n')}`
+    );
+  }
+
+  const realErrors = errorStatements.filter((e) => e.includes('ERROR:'));
+  if (realErrors.length > 0) {
+    throw new Error(
+      `OpenSCAD reported errors unioning the ${bodyStls.length} bodies in ${filePath}:\n${realErrors.join('\n')}`
+    );
+  }
+
+  return instance.FS.readFile('/u.stl');
+};
+
 const loadModel = async (filePath: string) => {
   const ext = path.extname(filePath).toLowerCase();
   if (ext !== '.stl' && ext !== '.step' && ext !== '.stp') {
@@ -146,8 +213,12 @@ const loadModel = async (filePath: string) => {
     );
     return { geometry, stlBytes: buffer };
   }
-  const geometry = await loadStepGeometry(buffer);
-  return { geometry, stlBytes: geometryToBinaryStl(geometry) };
+  const { geometry, bodyStls } = await loadStep(buffer);
+  const stlBytes =
+    bodyStls.length === 1
+      ? bodyStls[0]
+      : await preUnionBodyStls(filePath, bodyStls);
+  return { geometry, stlBytes };
 };
 
 const loadModels = async () => {
@@ -243,27 +314,7 @@ if (opts.scad) {
   log(`wrote ${opts.scad}`);
 }
 
-// next to the bundle in dist-cli, or under src/ when run from the repo root
-const cliDir = path.dirname(fileURLToPath(import.meta.url));
-const wasmPath = [
-  path.join(cliDir, 'openscad.wasm'),
-  path.join(cliDir, 'src', 'openscad.wasm'),
-].find((p) => existsSync(p));
-if (!wasmPath) {
-  console.error(`error: openscad.wasm not found next to ${cliDir}`);
-  process.exit(1);
-}
-
-const errorStatements: string[] = [];
-const instance = await OpenSCAD({
-  noInitialRun: true,
-  wasmBinary: (await readFile(wasmPath)).buffer,
-  print: (s: string) => log(`openscad: ${s}`),
-  printErr: (s: string) => {
-    errorStatements.push(s);
-    log(`openscad: ${s}`);
-  },
-});
+const { instance, errorStatements } = await createOpenScadInstance();
 
 instance.FS.writeFile('/input.scad', scadSrc);
 instance.FS.writeFile('/gold.stl', gold.stlBytes);
