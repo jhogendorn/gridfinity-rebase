@@ -3,9 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "bin": {
+    "gridfinity-rebase": "./dist-cli/cli.mjs"
+  },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "build:cli": "esbuild cli.ts --bundle --platform=node --format=esm --outfile=dist-cli/cli.mjs && cp src/openscad.wasm dist-cli/ && chmod +x dist-cli/cli.mjs",
+    "prepare": "npm run build:cli",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -28,6 +33,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.21.5",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
