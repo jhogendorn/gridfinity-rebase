@@ -12,6 +12,7 @@
     "build:cli": "esbuild cli.ts --bundle --platform=node --format=esm --outfile=dist-cli/cli.mjs && cp src/openscad.wasm dist-cli/ && chmod +x dist-cli/cli.mjs",
     "prepare": "npm run build:cli",
     "lint": "eslint .",
+    "test": "npm run build:cli && esbuild test/step-utils.test.ts --bundle --platform=node --format=esm --outfile=dist-test/step-utils.test.mjs 2>/dev/null; node --test 'test/**/*.test.mjs' 'dist-test/**/*.test.mjs'",
     "preview": "vite preview"
   },
   "dependencies": {
