@@ -71,7 +71,6 @@ const getOcctSession = (): Promise<OcctSession> => {
       const wasmBinary = (await readFile(resolveOcctWasmPath())).buffer;
       const diagnostics: string[] = [];
       const capture = (line: string) => {
-        console.error(line);
         diagnostics.push(line);
       };
       const occt: OcctModule = await occtimportjs({

@@ -21,8 +21,9 @@ import { geometryToBinaryStl, loadStepGeometry } from './src/step-utils.ts';
 // @ts-expect-error no declaration
 import OpenSCAD from './src/openscad.js';
 
-const usage = `gridfinity-rebase — swap the gridfinity base(s) of an STL model for the
-base of a reference STL, and optionally wrap it in stackable walls.
+const usage = `gridfinity-rebase — swap the gridfinity base(s) of a model (STL or STEP)
+for the base of a reference file (STL or STEP), and optionally wrap it in
+stackable walls. Output is always written as STL.
 
 Usage:
   gridfinity-rebase [options] <model> <reference>
@@ -32,7 +33,6 @@ Arguments:
   reference        any gridfinity module whose base you want to copy
                    (STL or STEP; both 42mm full-size and 21mm half-size
                    bases work, but the two files must use the same size)
-                   output is always written as STL
 
 Options:
   -o, --output <file>       output path (default: <model>-rebased.stl)
@@ -99,7 +99,7 @@ if (opts.version) {
 
 if (positionals.length !== 2) {
   console.error(
-    `error: expected exactly 2 arguments (a model STL and a reference STL), got ${positionals.length}\n`
+    `error: expected exactly 2 arguments (a model file and a reference file, STL or STEP), got ${positionals.length}\n`
   );
   process.stderr.write(usage);
   process.exit(2);
@@ -125,28 +125,36 @@ const log = (msg: string) => {
 };
 
 const loadModel = async (filePath: string) => {
-  const buffer = await readInputFile(filePath);
   const ext = path.extname(filePath).toLowerCase();
+  if (ext !== '.stl' && ext !== '.step' && ext !== '.stp') {
+    console.error(
+      ext === ''
+        ? `error: no file extension on ${filePath}: accepted formats are .stl, .step, .stp`
+        : `error: unsupported file extension '${ext}' for ${filePath}: accepted formats are .stl, .step, .stp`
+    );
+    return process.exit(2);
+  }
+
+  const buffer = await readInputFile(filePath);
   if (ext === '.stl') {
     const geometry = new STLLoader().parse(
       buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
     );
-    return { geometry, stlBytes: new Uint8Array(buffer) };
+    return { geometry, stlBytes: buffer };
   }
-  if (ext === '.step' || ext === '.stp') {
-    const geometry = await loadStepGeometry(new Uint8Array(buffer));
-    return { geometry, stlBytes: geometryToBinaryStl(geometry) };
-  }
-  console.error(
-    `error: unsupported file extension '${ext}' for ${filePath}: accepted formats are .stl, .step, .stp`
-  );
-  return process.exit(2);
+  const geometry = await loadStepGeometry(buffer);
+  return { geometry, stlBytes: geometryToBinaryStl(geometry) };
 };
 
-const [toFix, gold] = await Promise.all([
-  loadModel(toFixPath),
-  loadModel(goldPath),
-]);
+const loadModels = async () => {
+  try {
+    return await Promise.all([loadModel(toFixPath), loadModel(goldPath)]);
+  } catch (e) {
+    console.error(`error: ${(e as Error).message}`);
+    return process.exit(1);
+  }
+};
+const [toFix, gold] = await loadModels();
 const toFixGeometry = toFix.geometry;
 const goldGeometry = gold.geometry;
 
