@@ -93,10 +93,14 @@ test('loadStepGeometry: multi-body STEP merges every body', async () => {
   assert.equal(geometry.getIndex(), null);
 
   const actualPositions = geometry.attributes.position.array as Float32Array;
-  assert.deepStrictEqual(actualPositions, expectedPositions);
-  assert.ok(
-    Array.from(actualPositions).every((v) => !Number.isNaN(v)),
-    'merged positions must not contain NaN'
+  // element-wise compare instead of deepStrictEqual: node's assertion diff
+  // over two 540k-element arrays takes ~60s to fail with a useless message
+  assert.equal(actualPositions.length, expectedPositions.length);
+  const bad = actualPositions.findIndex((v, i) => v !== expectedPositions[i]);
+  assert.equal(
+    bad,
+    -1,
+    `merged positions differ at ${bad}: ${actualPositions[bad]} !== ${expectedPositions[bad]}`
   );
 });
 
