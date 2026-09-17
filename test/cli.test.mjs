@@ -65,9 +65,12 @@ test(
     // Pins byte-identical behavior of the pure-STL pipeline: raw file bytes
     // go into OpenSCAD's virtual FS unchanged, so this hash should only
     // change if the STL read/write path itself changes.
+    // Re-pinned deliberately for the "overlap the base-swap cut boundary to
+    // keep same-pitch output manifold" fix in scad-utils.ts (simple_cut's
+    // toFix cut now stops 0.01mm short of 2.6/5.5, changing output bytes).
     assert.equal(
       createHash('sha256').update(buffer).digest('hex'),
-      'dd982d0ef60258da9e2b3020c5a43a4dba7f7f7c8b70f5ed3a5aeeacd0f159d8'
+      '47a00f71b5a7f1e459fc53eda4b0599f34de09679fc422b0fcf1aa67f65ec12d'
     );
 
     const geometry = await parseStl(outputPath);

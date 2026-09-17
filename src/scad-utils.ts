@@ -193,9 +193,16 @@ module stack_shell() {
 $fs = 0.4;
 $fa = 4;
 ${stackShell}
-module simple_cut() {
-    translate([-${cutPitch} / 2, -${cutPitch} / 2, 0]) cube([${cutPitch}, ${cutPitch}, 2.6]);
-    translate([-${inner} / 2, -${inner} / 2, 0]) cube([${inner}, ${inner}, 5.5]);
+// overlap shrinks the cut by a hair so the (full-height) gold piece
+// unioned in below overlaps a sliver of the original body instead of
+// exactly touching it. Without this, toFix's cut boundary and gold's
+// extracted boundary are coincident planes at 2.6/5.5 that two
+// independently-tessellated meshes both claim, which produces a
+// non-manifold intersection there even though each solid is manifold on
+// its own.
+module simple_cut(overlap = 0) {
+    translate([-${cutPitch} / 2, -${cutPitch} / 2, 0]) cube([${cutPitch}, ${cutPitch}, 2.6 - overlap]);
+    translate([-${inner} / 2, -${inner} / 2, 0]) cube([${inner}, ${inner}, 5.5 - overlap]);
 }
 
 module preferred_bottom() {
@@ -218,7 +225,7 @@ union() {
 ${tileCenters
   .map(
     (center) =>
-      `        translate([${center[0]}, ${center[1]}, ${zMin}]) simple_cut();`
+      `        translate([${center[0]}, ${center[1]}, ${zMin}]) simple_cut(0.01);`
   )
   .join('\n')}
     }
