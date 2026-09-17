@@ -1,5 +1,6 @@
 import { Shape } from 'three';
-import { getShapeBoundingBoxCentroid, RotationType } from './hull-utils.ts';
+import { getShapeBoundingBoxCentroid } from './hull-utils.ts';
+import type { RotationType } from './hull-utils.ts';
 
 import { v4 as uuidv4 } from 'uuid';
 
