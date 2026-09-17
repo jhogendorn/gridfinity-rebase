@@ -46,12 +46,21 @@ With the geometry de-indexed, downstream detection code is untouched.
 
 ### Bundling the OCCT WASM
 
+`occt-import-js` is added as a regular (runtime) dependency in
+`package.json` and locked in `package-lock.json`, so `npm install`,
+`npm link`, and the `prepare` build stay reproducible.
+
 `build:cli` today copies only `src/openscad.wasm` into `dist-cli/`. It
 must also copy `occt-import-js.wasm` (from
 `node_modules/occt-import-js/dist/`), and `loadStepGeometry` must
 resolve it the same way `cli.ts` resolves `openscad.wasm`: next to the
 bundle in `dist-cli/`, falling back to `node_modules` when run from the
 repo root.
+
+Licensing: the README documents the bundled OpenSCAD artifacts as GPLv3.
+Add an equivalent note beside it for the new bundled artifact —
+`occt-import-js` (MIT wrapper) embedding Open CASCADE Technology
+(LGPL-2.1 with exception).
 
 ### Feeding OpenSCAD
 
