@@ -25,4 +25,10 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['test/**'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 )
