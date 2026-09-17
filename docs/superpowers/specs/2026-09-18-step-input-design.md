@@ -59,8 +59,8 @@ repo root.
 
 Licensing: the README documents the bundled OpenSCAD artifacts as GPLv3.
 Add an equivalent note beside it for the new bundled artifact —
-`occt-import-js` (MIT wrapper) embedding Open CASCADE Technology
-(LGPL-2.1 with exception).
+`occt-import-js` and the Open CASCADE Technology it embeds are both
+LGPL-2.1 (the package's own `license` field is LGPL-2.1, not MIT).
 
 ### Feeding OpenSCAD
 

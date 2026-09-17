@@ -89,7 +89,8 @@ test(
     t.after(() => rm(tmpDir, { recursive: true, force: true }));
     const outputPath = path.join(tmpDir, 'out.stl');
 
-    const { stdout } = await runCli([
+    const { stdout, stderr } = await runCli([
+      '-v',
       '-o',
       outputPath,
       'test/fixtures/box415.step',
@@ -97,6 +98,9 @@ test(
     ]);
 
     assert.ok(stdout.includes(outputPath));
+    // confirms OpenSCAD actually produced a watertight manifold from the
+    // tessellated STEP geometry, not just that some STL got written
+    assert.match(stderr, /Status:\s+NoError/);
 
     const geometry = await parseStl(outputPath);
 
@@ -159,6 +163,33 @@ test(
       Math.abs(size.y - 41.5) < 0.01,
       `expected y extent 41.5, got ${size.y}`
     );
+  }
+);
+
+test(
+  'CLI: STEP model + STEP gold produces a valid STL',
+  { timeout: 150_000 },
+  async (t) => {
+    // both inputs are STEP: exercises the shared memoized OCCT session and
+    // its per-call diagnostics buffer under the real Promise.all concurrency
+    // in loadModels(), not just a single loadStepGeometry call at a time.
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'gridfinity-rebase-test-'));
+    t.after(() => rm(tmpDir, { recursive: true, force: true }));
+    const outputPath = path.join(tmpDir, 'out.stl');
+
+    const { stdout } = await runCli([
+      '-o',
+      outputPath,
+      'test/fixtures/box415.step',
+      'test/fixtures/box415.step',
+    ]);
+
+    assert.ok(stdout.includes(outputPath));
+
+    const geometry = await parseStl(outputPath);
+
+    const triangleCount = geometry.attributes.position.count / 3;
+    assert.ok(triangleCount > 0, `expected a parseable STL, got ${triangleCount} triangles`);
   }
 );
 

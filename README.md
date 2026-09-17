@@ -11,11 +11,10 @@ npm run dev
 
 OpenSCAD is GPL software. `openscad.wasm` and `openscad.js` are distributed under the GPL, version 3.
 
-The bundled `occt-import-js` is MIT-licensed and embeds Open CASCADE
-Technology (LGPL-2.1 with exception). License texts ship in
-`node_modules/occt-import-js/dist/` (`license.occt.txt`,
-`license.occt-import-js.txt`) and are copied into `dist-cli/` alongside
-`occt-import-js.wasm` by `build:cli`.
+The bundled `occt-import-js` and the Open CASCADE Technology code it
+embeds are LGPL-2.1 (license texts `license.occt.txt` and
+`license.occt-import-js.txt`, copied into `dist-cli/` by `build:cli`);
+compatible with this project's GPLv3.
 
 ## CLI
 

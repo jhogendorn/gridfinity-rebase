@@ -13,7 +13,7 @@
     "prepare": "npm run build:cli",
     "lint": "eslint .",
     "check:cli": "tsc -p tsconfig.cli.json --noEmit",
-    "pretest": "npm run build:cli",
+    "pretest": "npm run check:cli && npm run build:cli",
     "test": "rm -rf dist-test && esbuild test/step-utils.test.ts --bundle --platform=node --format=esm --external:occt-import-js --outfile=dist-test/step-utils.test.mjs && node --test 'test/**/*.test.mjs' 'dist-test/**/*.test.mjs'",
     "preview": "vite preview"
   },

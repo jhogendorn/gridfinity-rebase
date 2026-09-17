@@ -23,7 +23,7 @@
 - Tessellation params (exact spelling, from the package README):
   `{ linearUnit: 'millimeter', linearDeflectionType: 'absolute_value', linearDeflection: 0.01, angularDeflection: 0.2 }`.
 - The WASM lives at `node_modules/occt-import-js/dist/occt-import-js.wasm`.
-  Licenses beside it: `license.occt.txt` (OCCT, LGPL-2.1 with exception), `license.occt-import-js.txt` (MIT).
+  Licenses beside it: `license.occt.txt` and `license.occt-import-js.txt`, both LGPL-2.1 (the package's own `license` field is LGPL-2.1, not MIT).
 - Base detection (`src/hull-utils.ts:38`) walks `position` in vertex triples
   and ignores `geometry.index` — STEP geometry MUST be de-indexed
   (`BufferGeometry.toNonIndexed()` or merge-time expansion) before detection.
@@ -163,8 +163,8 @@ Decisions:
   resolves from node_modules; the spec's preference is the copy).
 - [ ] **Step 2:** README: add STEP to the CLI usage section; beside the
   existing "OpenSCAD is GPL software" note (README.md:12), add: bundled
-  `occt-import-js` is MIT and embeds Open CASCADE Technology (LGPL-2.1 with
-  exception), license texts in `node_modules/occt-import-js/dist/`
+  `occt-import-js` and the Open CASCADE Technology it embeds are LGPL-2.1,
+  license texts in `node_modules/occt-import-js/dist/`
   (or `dist-cli/` if copied).
 - [ ] **Step 3:** Clean rebuild proof: `rm -rf dist-cli dist-test && npm test`
   — expected: everything rebuilds and passes.
