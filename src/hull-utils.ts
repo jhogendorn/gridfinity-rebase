@@ -127,10 +127,13 @@ export const getShapeHullsForGeometry = (
   return islandGeometries;
 };
 
-const expected = 35.6;
+// a gridfinity base bottom is pitch - 6.4 wide: 35.6 for full-size (42mm)
+// bases, 14.6 for half-size (21mm) bases
+export const SUPPORTED_PITCHES = [42, 21];
+const expectedBottomForPitch = (pitch: number) => pitch - 6.4;
 const badnessThreshold = 1;
 
-const isHullBad = (island: Shape) => {
+const getShapeSize = (island: Shape): [number, number] => {
   const points = island.extractPoints(1).shape;
 
   const minX = Math.min(...points.map((v) => v.x));
@@ -138,15 +141,29 @@ const isHullBad = (island: Shape) => {
   const minY = Math.min(...points.map((v) => v.y));
   const maxY = Math.max(...points.map((v) => v.y));
 
-  const width = maxX - minX;
-  const height = maxY - minY;
+  return [maxX - minX, maxY - minY];
+};
 
-  // console.log({ width, height });
+// the grid pitch whose expected base-bottom size matches this island, or
+// null if it doesn't look like a base at all
+export const getPitchForShape = (island: Shape): number | null => {
+  const [width, height] = getShapeSize(island);
 
-  return (
-    Math.abs(width - expected) > badnessThreshold ||
-    Math.abs(height - expected) > badnessThreshold
-  );
+  for (const pitch of SUPPORTED_PITCHES) {
+    const expected = expectedBottomForPitch(pitch);
+    if (
+      Math.abs(width - expected) <= badnessThreshold &&
+      Math.abs(height - expected) <= badnessThreshold
+    ) {
+      return pitch;
+    }
+  }
+
+  return null;
+};
+
+const isHullBad = (island: Shape) => {
+  return getPitchForShape(island) === null;
 };
 
 export type RotationType = 'original' | 'x+' | 'x-' | 'y+' | 'y-' | '180';
