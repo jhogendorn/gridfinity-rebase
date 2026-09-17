@@ -25,6 +25,7 @@ dist-ssr
 
 
 *.stl
-!public/default-gold-refined-3.stldist-cli
+!public/default-gold-refined-3.stl
 !test/fixtures/*.stl
 dist-test/
+dist-cli/

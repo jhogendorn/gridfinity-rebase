@@ -11,15 +11,22 @@ npm run dev
 
 OpenSCAD is GPL software. `openscad.wasm` and `openscad.js` are distributed under the GPL, version 3.
 
+The bundled `occt-import-js` is MIT-licensed and embeds Open CASCADE
+Technology (LGPL-2.1 with exception). License texts ship in
+`node_modules/occt-import-js/dist/` (`license.occt.txt`,
+`license.occt-import-js.txt`) and are copied into `dist-cli/` alongside
+`occt-import-js.wasm` by `build:cli`.
+
 ## CLI
 
 ```
 npm install
 npm link        # puts `gridfinity-rebase` on your PATH
-gridfinity-rebase [options] <model.stl> <reference.stl>
+gridfinity-rebase [options] <model> <reference>
 ```
 
-Writes `<model>-rebased.stl` (binary STL) by default; see
+Inputs may be `.stl`, `.step`, or `.stp`, in any mix; output is always
+written as STL. Writes `<model>-rebased.stl` (binary STL) by default; see
 `gridfinity-rebase --help` for options. Both full-size (42mm) and
 half-size (21mm) gridfinity bases are supported, in any combination.
 The 42mm cell is the unit: for mixed pitches the whole underside is
