@@ -52,20 +52,24 @@ Examples:
   gridfinity-rebase -s 4 -o bin-stackable.stl bin.stl nice-base.stl
 `;
 
-let parsed: ReturnType<typeof parseArgs<{ options: {} }>>;
+const parseArgsOptions = {
+  output: { type: 'string', short: 'o' },
+  stackable: { type: 'string', short: 's' },
+  'no-rotate-input': { type: 'boolean', default: false },
+  'no-rotate-gold': { type: 'boolean', default: false },
+  scad: { type: 'string' },
+  ascii: { type: 'boolean', default: false },
+  verbose: { type: 'boolean', short: 'v', default: false },
+  version: { type: 'boolean', short: 'V', default: false },
+  help: { type: 'boolean', short: 'h', default: false },
+} as const;
+
+let parsed: ReturnType<
+  typeof parseArgs<{ options: typeof parseArgsOptions; allowPositionals: true }>
+>;
 try {
   parsed = parseArgs({
-    options: {
-      output: { type: 'string', short: 'o' },
-      stackable: { type: 'string', short: 's' },
-      'no-rotate-input': { type: 'boolean', default: false },
-      'no-rotate-gold': { type: 'boolean', default: false },
-      scad: { type: 'string' },
-      ascii: { type: 'boolean', default: false },
-      verbose: { type: 'boolean', short: 'v', default: false },
-      version: { type: 'boolean', short: 'V', default: false },
-      help: { type: 'boolean', short: 'h', default: false },
-    },
+    options: parseArgsOptions,
     allowPositionals: true,
   });
 } catch (e) {
