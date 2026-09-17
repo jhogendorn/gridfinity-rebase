@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
-    "build:cli": "esbuild cli.ts --bundle --platform=node --format=esm --outfile=dist-cli/cli.mjs && cp src/openscad.wasm dist-cli/ && chmod +x dist-cli/cli.mjs",
+    "build:cli": "esbuild cli.ts --bundle --platform=node --format=esm --external:occt-import-js --outfile=dist-cli/cli.mjs && cp src/openscad.wasm dist-cli/ && chmod +x dist-cli/cli.mjs",
     "prepare": "npm run build:cli",
     "lint": "eslint .",
     "pretest": "npm run build:cli",

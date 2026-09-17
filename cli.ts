@@ -16,6 +16,7 @@ import {
   getZMinForGeometry,
 } from './src/hull-utils.ts';
 import { generateScadForShapes } from './src/scad-utils.ts';
+import { geometryToBinaryStl, loadStepGeometry } from './src/step-utils.ts';
 
 // @ts-expect-error no declaration
 import OpenSCAD from './src/openscad.js';
@@ -24,13 +25,14 @@ const usage = `gridfinity-rebase — swap the gridfinity base(s) of an STL model
 base of a reference STL, and optionally wrap it in stackable walls.
 
 Usage:
-  gridfinity-rebase [options] <model.stl> <reference.stl>
+  gridfinity-rebase [options] <model> <reference>
 
 Arguments:
-  model.stl        the model whose bases you want replaced
-  reference.stl    any gridfinity module whose base you want to copy
-                   (both 42mm full-size and 21mm half-size bases work,
-                   but the two files must use the same size)
+  model            the model whose bases you want replaced (STL or STEP)
+  reference        any gridfinity module whose base you want to copy
+                   (STL or STEP; both 42mm full-size and 21mm half-size
+                   bases work, but the two files must use the same size)
+                   output is always written as STL
 
 Options:
   -o, --output <file>       output path (default: <model>-rebased.stl)
@@ -116,23 +118,37 @@ const readInputFile = async (filePath: string) => {
 
 const [toFixPath, goldPath] = positionals;
 const outputPath =
-  opts.output ?? toFixPath.replace(/(\.stl)?$/i, '-rebased.stl');
+  opts.output ?? toFixPath.replace(/(\.stl|\.step|\.stp)?$/i, '-rebased.stl');
 
 const log = (msg: string) => {
   if (opts.verbose) console.error(msg);
 };
 
-const loadGeometry = async (filePath: string) => {
+const loadModel = async (filePath: string) => {
   const buffer = await readInputFile(filePath);
-  return new STLLoader().parse(
-    buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.stl') {
+    const geometry = new STLLoader().parse(
+      buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    );
+    return { geometry, stlBytes: new Uint8Array(buffer) };
+  }
+  if (ext === '.step' || ext === '.stp') {
+    const geometry = await loadStepGeometry(new Uint8Array(buffer));
+    return { geometry, stlBytes: geometryToBinaryStl(geometry) };
+  }
+  console.error(
+    `error: unsupported file extension '${ext}' for ${filePath}: accepted formats are .stl, .step, .stp`
   );
+  return process.exit(2);
 };
 
-const [toFixGeometry, goldGeometry] = await Promise.all([
-  loadGeometry(toFixPath),
-  loadGeometry(goldPath),
+const [toFix, gold] = await Promise.all([
+  loadModel(toFixPath),
+  loadModel(goldPath),
 ]);
+const toFixGeometry = toFix.geometry;
+const goldGeometry = gold.geometry;
 
 const { shapes, rotation, badness } = getBestShapeHullsForGeometry(
   toFixGeometry,
@@ -238,8 +254,8 @@ const instance = await OpenSCAD({
 });
 
 instance.FS.writeFile('/input.scad', scadSrc);
-instance.FS.writeFile('/gold.stl', new Uint8Array(await readFile(goldPath)));
-instance.FS.writeFile('/toFix.stl', new Uint8Array(await readFile(toFixPath)));
+instance.FS.writeFile('/gold.stl', gold.stlBytes);
+instance.FS.writeFile('/toFix.stl', toFix.stlBytes);
 
 let output: Uint8Array;
 try {
