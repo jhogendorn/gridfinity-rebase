@@ -25,7 +25,7 @@ interface OcctMesh {
 
 interface OcctReadStepResult {
   success: boolean;
-  meshes: OcctMesh[];
+  meshes?: OcctMesh[];
 }
 
 interface OcctModule {
@@ -56,34 +56,58 @@ const resolveOcctWasmPath = (): string => {
   return wasmPath;
 };
 
-let occtPromise: Promise<OcctModule> | null = null;
+interface OcctSession {
+  occt: OcctModule;
+  // recent print/printErr lines, cleared before each ReadStepFile call, so a
+  // failure can report why instead of a contentless error
+  diagnostics: string[];
+}
 
-const getOcct = (): Promise<OcctModule> => {
-  if (!occtPromise) {
-    occtPromise = (async () => {
+let sessionPromise: Promise<OcctSession> | null = null;
+
+const getOcctSession = (): Promise<OcctSession> => {
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
       const wasmBinary = (await readFile(resolveOcctWasmPath())).buffer;
-      return occtimportjs({ wasmBinary });
+      const diagnostics: string[] = [];
+      const capture = (line: string) => {
+        console.error(line);
+        diagnostics.push(line);
+      };
+      const occt: OcctModule = await occtimportjs({
+        wasmBinary,
+        print: capture,
+        printErr: capture,
+      });
+      return { occt, diagnostics };
     })();
   }
-  return occtPromise;
+  return sessionPromise;
 };
 
 export async function loadStepGeometry(
   data: Uint8Array
 ): Promise<BufferGeometry> {
-  const occt = await getOcct();
+  const { occt, diagnostics } = await getOcctSession();
+  diagnostics.length = 0;
   const result = occt.ReadStepFile(data, OCCT_PARAMS);
-  if (!result.success || result.meshes.length === 0) {
-    throw new Error('failed to parse STEP file');
+  if (!result.success) {
+    throw new Error(
+      `failed to parse STEP file: ${diagnostics.join('\n') || '(no diagnostics)'}`
+    );
   }
+  if (!result.meshes?.length) {
+    throw new Error('STEP file contains no solid bodies');
+  }
+  const meshes = result.meshes;
 
-  const vertexCount = result.meshes.reduce(
+  const vertexCount = meshes.reduce(
     (sum, mesh) => sum + mesh.index.array.length,
     0
   );
   const positions = new Float32Array(vertexCount * 3);
   let offset = 0;
-  for (const mesh of result.meshes) {
+  for (const mesh of meshes) {
     const meshPositions = mesh.attributes.position.array;
     for (const vertexIndex of mesh.index.array) {
       positions[offset++] = meshPositions[vertexIndex * 3];
