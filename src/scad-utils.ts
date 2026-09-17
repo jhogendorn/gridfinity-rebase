@@ -29,7 +29,6 @@ export const generateScadForShapes = (
   });
 
   const goldCenter = getShapeBoundingBoxCentroid(goldShape);
-  console.log({ goldCenter });
 
   return `
 module simple_cut() {
