@@ -510,7 +510,7 @@ function App() {
       shapes,
       zMin,
       rotation,
-      firstGoldShape,
+      goldShapes,
       goldZMin,
       goldRotation
     );
