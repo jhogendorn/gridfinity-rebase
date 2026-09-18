@@ -183,68 +183,17 @@ module stack_shell() {
     stackShellCall = '    stack_shell();\n';
   }
 
-  if (goldPitch === pitch) {
-    // same-pitch swap: cut each base individually (42mm to 2.6, inner to
-    // 5.5) and drop the gold base in. the ring between inner and the cell
-    // edge above 2.6 is kept: old and new chamfers coincide there.
-    const inner = cutPitch - 8;
-
-    return `
-$fs = 0.4;
-$fa = 4;
-${stackShell}
-// overlap shrinks the cut by a hair so the (full-height) gold piece
-// unioned in below overlaps a sliver of the original body instead of
-// exactly touching it. Without this, toFix's cut boundary and gold's
-// extracted boundary are coincident planes at 2.6/5.5 that two
-// independently-tessellated meshes both claim, which produces a
-// non-manifold intersection there even though each solid is manifold on
-// its own.
-module simple_cut(overlap = 0) {
-    translate([-${cutPitch} / 2, -${cutPitch} / 2, 0]) cube([${cutPitch}, ${cutPitch}, 2.6 - overlap]);
-    translate([-${inner} / 2, -${inner} / 2, 0]) cube([${inner}, ${inner}, 5.5 - overlap]);
-}
-
-module preferred_bottom() {
-    intersection() {
-        translate([-1 * ${goldCenter[0]},
-                   -1 * ${goldCenter[1]},
-                   -1 * ${goldZMin}]) {
-          ${rotateSCADCodeForRotation(goldRotation.type)} {
-            import("/gold.stl");
-          }
-        }
-        simple_cut();
-    }
-}
-
-union() {
-    difference() {
-        ${rotateSCADCodeForRotation(rotation.type)} import("/toFix.stl");
-
-${tileCenters
-  .map(
-    (center) =>
-      `        translate([${center[0]}, ${center[1]}, ${zMin}]) simple_cut(0.01);`
-  )
-  .join('\n')}
-    }
-
-${tileCenters
-  .map(
-    (center) =>
-      `    translate([${center[0]}, ${center[1]}, ${zMin}]) preferred_bottom();`
-  )
-  .join('\n')}
-${stackShellCall}}
-
-`;
-  }
-
-  // mixed-pitch swap: lop the whole underside off (everything below 5.5),
-  // tessellate the gold's cutPitch-sized unit across the footprint, and
-  // trim the tiles to the model's silhouette (taken just above the lop
-  // plane) so overhanging tiles end flush with the model's walls
+  // lop-and-tile: handles all swaps, same-pitch and mixed-pitch alike. lop
+  // the whole underside off (everything below 5.5), tessellate the gold's
+  // cutPitch-sized unit across the footprint, and trim the tiles to the
+  // model's silhouette (taken just above the lop plane) so overhanging
+  // tiles end flush with the model's walls. (History: same-pitch swaps used
+  // to go through a separate per-foot surgical branch — cut each base to
+  // 2.6/5.5 and drop the gold base in directly — but splicing the model's
+  // and gold's identical foot surfaces from two independently-tessellated
+  // meshes produced non-manifold seams at the cut boundary. Lop-and-tile's
+  // only joint is a horizontal overlap buried inside solid material, so it
+  // has no such seam; it's used unconditionally now.)
   const xs = centers.map((c) => c[0]);
   const ys = centers.map((c) => c[1]);
   const lopX = Math.min(...xs) - pitch;

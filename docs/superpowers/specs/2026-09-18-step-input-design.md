@@ -117,6 +117,22 @@ same as today. This matches how multi-shell STL inputs already flow
 through the pipeline, and holds for both the model and the reference
 input.
 
+The same coincident-plane seam class turned up again downstream, in the
+base-swap SCAD itself (`generateScadForShapes`, `scad-utils.ts`): the
+same-pitch swap used to cut each base individually and drop the gold
+base in directly, so the model's cut boundary and the gold's extracted
+boundary were coincident planes both claimed by independently-
+tessellated meshes — non-manifold, exactly like the multi-body case
+above, even for single-body STEP/STL inputs. (Confirmed on a real
+7-body screwdriver-holder model: 1174 edges shared by more than two
+triangles.) That per-foot surgical branch was removed; same-pitch swaps
+now go through the same "lop-and-tile" SCAD mixed-pitch swaps already
+used — lop the whole underside off along one flat plane and tile the
+gold's unit across the footprint — whose only joint is a horizontal
+overlap buried inside solid material, not a spliced surface. Verified
+0 open edges and 0 edges shared by more than two triangles on the same
+case afterward.
+
 Assumption, inherited from the existing detector: bases are detected
 only on faces within 0.001mm of the model's **global** minimum Z
 (`hull-utils.ts`). Bodies whose bottom sits above that plane are carried
