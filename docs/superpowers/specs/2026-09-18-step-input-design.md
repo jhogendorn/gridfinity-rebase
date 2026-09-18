@@ -1,7 +1,7 @@
 # STEP input support for the CLI
 
 Date: 2026-09-18
-Status: approved design, pending implementation plan
+Status: implemented (plan: docs/superpowers/plans/2026-09-18-step-input.md; shipped f9074e1..8f57fc4)
 
 ## Goal
 
